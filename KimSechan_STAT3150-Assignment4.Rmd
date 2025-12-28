@@ -1,0 +1,385 @@
+---
+title: "Assignment 4"
+author: "Sechan, Kim"
+date: "Due on November 10, 2025 (extended deadline)"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+header-includes: \linespread{1.3} 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This assignment covers the modules on 
+
+ - **Monte Carlo Integration**
+ - **Importance Sampling**
+ - **Monte Carlo Inference**. 
+
+The assignment contains **three problems** with multiple parts, worth a total of **30 marks**.
+
+**Instructions**:
+
+  - Rename the file `Assignment4.Rmd` as follows:
+    + `LastnameFirstname_STAT3150-Assignment4.Rmd`
+    
+  - Change the author's name at the top (where you see `First, Last Name`).
+  
+  -  Your solutions must be typed using \LaTeX. One mark will be deducted each time an image is used to show a handwritten solution.
+  
+  - No extensions can be granted for this assignment (unless the student has special permission from Student Accessibility Services).
+  
+  - Assignments submitted after the deadline will receive a grade of zero and will not be accepted.
+  
+  - Solutions must be submitted electronically via UM Learn:
+  
+\begin{center}
+\textbf{no later than 11:59PM CDT on Monday, November 10$^{\text{th}}$}
+\end{center}
+  
+   - Please upload both the `Rmd` file and a PDF version of the output on UMLEARN: 
+   
+\begin{center}
+Course Page > Assessment > Assignments > Assignment 4 > Add File. 
+\end{center}
+
+  - You are allowed to discuss the problems among yourselves, but your submission must reflect your original work. Note that your `R` code will be analysed for suspicious similarities.
+
+
+  
+------
+
+\newpage
+
+# Problem 1
+
+Suppose we are interested in estimating the following quantity:
+
+$$ \theta = \mathbb{E}(|X|), \qquad X \overset{\text{i.i.d}}\sim t(3).$$
+
+In other words, the expected value of the absolute value of a t-distributed random variable $X$ on 3 degrees of freedom. Use `n=1000` and `set.seed(3150)` throughout this question.
+
+  a) **(2 marks)** Compute an estimate and standard error of $\theta$ using classical Monte Carlo integration (sampling from t-distribution on 3 degrees of freedom).
+```{r}
+set.seed(3150)
+n <- 1000
+x <- rt(n, 3)
+est <- mean(abs(x))
+sigma <- sd(abs(x))
+
+print(paste("estimate:", est))
+print(paste("standard error:", sigma/sqrt(n)))
+
+
+```
+  b) **(2 marks)** Give an estimate and standard error using importance sampling function with $\phi_1$ the density of a t distribution on 1 degree of freedom (also known as Cauchy distribution).
+```{r}
+set.seed(3150)
+n <- 1000
+y1 <- rcauchy(n)
+g_y1 <- abs(y1)
+f_y1 <- dt(y1,3)
+phi1_y1 <- dcauchy(y1)
+w1 <- f_y1/phi1_y1
+vals1 <- g_y1 * w1
+theta_hat_is1 <- mean(vals1)
+se_is1 <- sd(vals1) / sqrt(n)
+
+cat(sprintf("b) IS (t(1)): Estimate = %.5f, SE = %.5f\n", 
+            theta_hat_is1, se_is1))
+
+
+```
+  c) **(2 marks)** Give an estimate  and standard error using importance sampling function with $\phi_2$ the density of a standard normal distribution.
+```{r}
+set.seed(3150)
+n <- 1000
+y2 <- rnorm(n,0,1)
+g_y2 <- abs(y2)
+f_y2 <- dt(y2, 3)
+phi2_y2 <- dnorm(y2,0,1)
+
+w2 <- f_y2/phi2_y2
+
+vals2 <- g_y2 * w2
+theta_hat_is2 <- mean(vals2)
+se_is2 <- sd(vals2) / sqrt(n)
+
+cat(sprintf("b) IS (t(2)): Estimate = %.5f, SE = %.5f\n", 
+            theta_hat_is2, se_is2))
+
+```
+  d) **(2 marks)** Give an estimate  and standard error using importance sampling function with $\phi_3$ the density of a standard logistic distribution.
+```{r}
+set.seed(3150)
+n <- 1000
+y3 <- rlogis(n,0,1)
+g_y3 <- abs(y3)
+f_y3 <- dt(y3, 3)
+phi3_y3 <- dlogis(y3, 0, 1)
+
+w3 <- f_y3/phi3_y3
+
+vals3 <- g_y3 * w3
+theta_hat_is3 <- mean(vals3)
+se_is3 <- sd(vals3) / sqrt(n)
+
+cat(sprintf("b) IS (t(2)): Estimate = %.5f, SE = %.5f\n", 
+            theta_hat_is3, se_is3))
+
+```
+  e) **(2 marks)** Using a visual plot, compare the ratios of $\frac{|g(x)|f(x)}{\phi(x)}$ for the three importance sampling functions $\{\phi_1$, $\phi_2$, $\phi_3\}$ when $x \in (-10, 10)$. Use `x <- seq(-10, 10, length.out = 1000)`.
+```{r}
+x_plot <- seq(-10, 10, length.out = 1000)
+g_x <- abs(x_plot)
+f_x <- dt(x_plot, df = 3)
+
+numerator <- g_x * f_x
+
+phi1 <- dt(x_plot, df = 1)
+phi2 <- dnorm(x_plot)
+phi3 <- dlogis(x_plot)
+
+ratio1 <- numerator / phi1
+ratio2 <- numerator / phi2
+ratio3 <- numerator / phi3
+
+plot(x_plot, ratio1, type = "l", col = "blue", 
+     ylim = c(0, 2.5), 
+     main = "Comparison of Ratios |x|f(x)/phi(x)",
+     xlab = "x", ylab = "Ratio Value",
+     lwd = 2)
+lines(x_plot, ratio2, col = "red", lty = 2, lwd = 2)
+lines(x_plot, ratio3, col = "darkgreen", lty = 3, lwd = 2)
+
+
+```
+
+
+\newpage 
+
+# Problem 2
+
+Suppose that we draw 10 random samples from a normal distribution with unknown mean and variance 1. That is, $$X_1, \dots, X_{10} \overset{\text{i.i.d}}\sim N(\mu, 1).$$
+
+Consider three different estimators for the mean $\mu$:
+
+\begin{align*}
+  \hat{\mu}_1 &= \bar{X} \\
+  \hat{\mu}_2 &= X_5 \\
+  \hat{\mu}_3 &= 1
+\end{align*}
+ 
+  a) **(3 marks)** Calculate the mean for each estimator as
+  \[
+  \mathbb{E}(\hat{\mu}_i) \quad \quad \text{for } i=1,2,3.
+  \]
+  
+\begin{align*}
+  \mathbb{E}(\hat{\mu}_1): \mathbb{E}(\hat{\mu}_1) = \mathbb{E}(\bar{X}) = \mathbb{E}(\frac{1}{n}\sum_{i=1}^{n}X_i) = \frac{1}{n}\sum_{i=1}^{n}\mathbb{E}(X_i) = \frac{1}{n}(n\mu) = \mu\\
+  \mathbb{E}(\hat{\mu}_2): \mathbb{E}(\hat{\mu}_2) = \mathbb{E}(X_5) = \mu\\
+  \mathbb{E}(\hat{\mu}_3) = \mathbb{E}(\hat{\mu}_3) = \mathbb{E}(1) = 1
+\end{align*}
+
+  
+  
+  b) **(3 marks)** Calculate the MSE for each estimator as
+  \[
+  \text{MSE}(\hat{\mu}_i)= \left[\text{Bias}(\hat{\mu}_i)\right]^2 + \text{Var}(\hat{\mu}_i) \quad \quad \text{for } i=1,2,3.
+  \]
+  
+  
+\begin{align*}
+MSE(\hat{\mu}_1) = Bias(\hat{\mu}_1)^2 + Var(\hat{\mu}_1)\\
+Bias(\hat{\mu}_1) = \mu - \mu = 0\\
+Var(\hat{\mu}_1) = {Var}(\bar{X}) = {Var}(\frac{1}{n}\sum_{i=1}^{n}X_i) =\\ \frac{1}{n^2}\sum_{i=1}^{n}{Var}(X_i) = \frac{1}{n^2}(n) = \frac{1}{n}\\
+MSE(\hat{\mu}_1) = 0 + 1/10 = 0.1\\
+MSE(\hat{\mu}_2) = Bias(\hat{\mu}_2)^2 + Var(\hat{\mu}_2)\\
+Bias(\hat{\mu}_2) = \mu - \mu = 0\\
+Var(\hat{\mu}_2) = Var(X_5) = 1\\
+MSE(\hat{\mu}_2) = 0 + 1 = 1\\
+MSE(\hat{\mu}_3) = Bias(\hat{\mu}_3)^2 + Var(\hat{\mu}_3)\\
+Bias(\hat{\mu}_3)^2 = E(\hat{\mu}_3) - \mu = 1 - \mu\\
+Var(\hat{\mu}_3) = Var(1) = 0\\
+MSE(\hat{\mu}_3) = (1-\mu)^2 + 0 = (1-\mu)^2\\
+\end{align*}
+
+  c) **(2 marks)** Plot the MSE as a function of $\mu \in (-2,4)$ for each estimator.  Use `mu <- seq(-2, 4, length.out = 1000)`.
+```{r}
+mu <- seq(-2, 4, length.out = 1000)
+mse1 <- rep(0.1, length(mu))
+mse2 <- rep(1 ,length(mu))
+mse3 <- (1-mu)^2
+
+plot(mu, mse3, type = "l", col = "darkgreen",
+     main = "MSE of Estimators as a Function of mu",
+     xlab = "True mean (mu)", ylab = "MSE",
+     lwd = 2, 
+     ylim = c(0, max(mse3))) 
+lines(mu, mse1, col = "blue", lty = 2, lwd = 2)
+lines(mu, mse2, col = "red", lty = 3, lwd = 2)
+```
+  d) **(2 marks)** Comment on the plot. What can you conclude regarding when each estimator should be preferred? 
+  
+The plot shows how MSE of each estimator changes depending on the mu value.
+hat(mu_1) and hat(mu_2) shows constant MSE regardless to the value of mu. In contrast, the MSE of hat(mu_3) shows a shape of parabola which changes depending on the value of mu. And the hat(mu_3) has minimum 0 when mu = 1.
+
+hat(mu_2) is literally not preferred, because it always has lower variance than hat(mu_3).
+hat(mu_3) is preferred when the MSE of hat(mu_1) is bigger than its MSE. So if we have a strong prior belief about the real mu value, we choose hat(mu_3) to reduce MSE.
+Otherwise, hat(mu_1) is preferred, because it shows better estimation than hat(mu_3) when mu is outside of 1.
+
+
+\newpage
+
+# Problem 3
+
+Recall that the $t$-test is robust to mild departures from normality. In this question, you will use Monte Carlo simulation to investigate whether the empirical Type I error rate of the $t$-test is approximately equal to the nominal significance level $\alpha$, when the sampled population is non-normal. 
+The following function will simulate data according to a given distribution, and then run a $t$-test, and assess whether or not to reject the null hypothesis:
+
+```{r t.test}
+# alpha =         significance level
+# mu0 =           hypothesized mean
+# distribution =  built-in R function to generate random variables
+# n =             sample size
+# ... =           additional parameters to be passed into distribution
+
+simulate.t.test <- function(alpha, mu0, distribution, n, ...){
+input <- c(...)
+dist.sample <- do.call(distribution, c(n, as.list(input))) # generate sample
+output <- t.test(dist.sample, mu = mu0) # t-test
+return(output$p.value < alpha) # reject or accept p-value
+}
+
+```
+
+a) **(4 marks)** Set your seed to 3150. For each of the following distributions, run the function `simulate.t.test()` 100 times and average the results to obtain an estimate of the empirical type I error rate.  
+ 
+ 1. $\chi^2 (1)$
+ 2. $U(1, 3)$
+ 3. $Exp(2)$
+ 4. $N(0, 1)$
+
+```{r, results = 'asis', warning=FALSE}
+set.seed(3150)
+n <- 100
+
+means <- c(1,2,0.5,0)
+dists <- c("rchisq", "runif", "rexp", "rnorm")
+params <- list(
+  list(df = 1),
+  list(min = 1, max = 3),
+  list(rate = 2),
+  list(mean = 0, sd = 1)
+)
+
+results <- numeric(4)
+for(i in 1:4){
+  count <- 0
+  for(j in 1:100){
+    count <- count + simulate.t.test(0.05, means[i], dists[i], 20, params[[i]])
+  }
+  results[i] <- count/100
+}
+results
+```
+
+
+b) **(4 marks)** For your simulation study, use $m = 1000$ replicates, $n = 20$, and a nominal significance level of $0.05$. The hypothesized mean should be the mean of $\chi^2 (1)$, $U(1, 3)$, $Exp(2)$, and $N(0, 1)$ respectively.  Repeat your simulation study above for $n = 40$, $n = 80$, $n = 160$, and $n = 320$. Display your results (including $n=20$) in a neatly-formatted \LaTeX table by using the `xtable` package. 
+
+**Note 1**: You may need to include the results = 'asis' option in your Rmarkdown chunk to ensure that the \LaTeX table you generate is displayed properly in the resulting .Rmd file: ` ```{r, results = 'asis'}``` `
+
+**Note 2**: After implementing this part, knitting to a .pdf file may take a while! 
+```{r, results = 'asis', warning=FALSE}
+set.seed(3150)
+
+m <- 1000
+alpha <- 0.05
+n_values <- c(20,40,80,160,320)
+
+results_matrix <- matrix(0, 4, 5)
+
+for(i in 1:4){
+  for(j in 1:length(n_values)){
+    n <- n_values[j]
+    count <- 0
+    for(k in 1:m){
+      count <- count + simulate.t.test(alpha, means[i], dists[i], n, params[[i]])
+    }
+    results_matrix[i, j] <- count/m
+  }
+}
+
+results_df <- data.frame(
+  distribution = c("chisq(1)", "U(1,3)", "Exp(2)", "N(0,1)"),
+  n20 <- results_matrix[,1],
+  n40 <- results_matrix[,2],
+  n80 <- results_matrix[,3],
+  n160 <- results_matrix[,4],
+  n320 <- results_matrix[,5]
+)
+
+colnames(results_df) <- c("Distribution", "n=20", "n=40", "n=80", "n=160", "n=320")
+
+library(xtable)
+latex_table <- xtable(results_df, caption = "Empirical Type I Error Rates")
+print(latex_table, comment = FALSE, include.rownames = FALSE)
+```
+
+c) **(2 marks)** In one or two short paragraphs, discuss your findings in part (b).
+The empirical Type I error rates shows the stability of the t-test. As sample size increases, these error rates converges to the nominal level of 0.05, across all 4 distributions. This result shows the Central limit theorem: as n increases the distribution of the sample mean approaches normal value regardless of their population distributions.
+Although some skewed distributions like chi-square and exponential show devations, they also converge toward 0.05 as sample size increases. It defines that he t-test maintains appropriate Type I error control even with non-normal data when samples are sufficiently large.
+
+
+
+\newpage
+
+# Appendix
+
+This is a tutorial to help you answer Question 3. The relavant code for the following tasks are provided:
+
+ - Generating a table in \LaTeX using `xtable` package when compiling a PDF document.
+
+```{r, results = 'asis', warning=FALSE}
+library(xtable) # Load the xtable package
+
+data <- data.frame(
+  Name = c("Alice", "Bob", "Charlie"),
+  Score = c(85, 90, 78) )
+
+latex_table <- xtable(data) # Convert the data frame to LaTeX table format
+
+print(latex_table, comment = FALSE) # Print the LaTeX code to the console
+
+```
+
+ - Using `do.call` function for simulating data from $\chi^2 (1)$, $U(1, 3)$, $Exp(2)$, $N(0, 1)$ distribution.
+ 
+```{r, do.call }
+set.seed(3150)
+# Uniform(1,3)
+args1 <- list(n = 1000, min = 1, max = 3)
+data1 <- do.call(runif, args1)
+
+# Exponential(3)
+args2 <- list(n = 1000, rate = 3)
+data2 <- do.call(rexp, args2)
+
+# Chi-square(1)
+args3 <- list(n = 1000, df = 1)
+data3 <- do.call(rchisq, args3)
+
+# Normal(0,1)
+args4 <- list(n = 1000, mean = 0, sd = 1)
+data4 <- do.call(rnorm, args4)
+
+# plot data
+par(mfrow = c(2, 2))
+hist(data1, main = "Uniform(1,3)", col = "lightblue")
+hist(data2, main = "Exponential(3)", col = "lightgreen")
+hist(data3, main = "Chi-square(1)", col = "lightcoral")
+hist(data4, main = "Normal(0,1)", col = "lightgray")
+```
+

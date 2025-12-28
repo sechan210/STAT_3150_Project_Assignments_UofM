@@ -1,0 +1,314 @@
+---
+title: "Assignment 6"
+author: "Sechan Kim 7896495"
+date: "Due on December 5th at 11:59 PM"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+header-includes: \linespread{1.3}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This assignment covers the resampling module: 
+
+- **Permutation Tests**.
+
+The assignment contains **three problems** with multiple parts, worth a total of **30 marks**.
+
+**Instructions**:
+
+  - Rename the file `Assignment6.Rmd` as follows:
+    + `LastnameFirstname_STAT3150-Assignment6.Rmd`
+    
+  - Add your name at the top header of the assignment.
+  
+  -  Your solutions must be typed using \LaTeX. One mark will be deducted each time an image is used to show a handwritten solution.
+  
+  - No extensions can be granted for this assignment (unless the student has special permission from Student Accessibility Services).
+  
+  - Assignments submitted after the deadline will receive a grade of zero and will not be accepted.
+
+  - The use of generative AI tools for this assignment will be treated as academic misconduct, and disciplinary action will be taken.
+  
+  - You are allowed to discuss the problems among yourselves, but your submission must reflect your original work. Note that your `R` code will be analysed for suspicious similarities.
+
+   - Please upload both the `Rmd` file and a PDF version of the output on UMLEARN: 
+   
+\begin{center}
+Course Page > Assessment > Assignments > Assignment 6 > Add File. 
+\end{center}
+
+  - Solutions must be submitted electronically via UM Learn:
+  
+\begin{center}
+\textbf{no later than 11:59PM CDT on Friday, December 5$^{\text{th}}$}
+\end{center}
+
+------
+
+\newpage
+
+# Problem 1
+
+Suppose you generate one sample of size $n_1=30$ from a $\mathcal{N}\left(5, 4 \right)$ distribution, and one sample of size $n_2=30$ from a $\mathcal{N}\left(5, 9 \right)$ distribution. You want to test for equality of distributions using these two samples, and decide that you should use a permutation test. Use `set.seed(3150)` and $N=1000$ replications.
+
+```{r data.gen}
+set.seed(3150)
+n1 <- n2 <- 30
+x1 <- rnorm(n1, mean=5, sd=2)
+x2 <- rnorm(n2, mean=5, sd=3)
+x <- c(x1, x2)
+
+
+```
+  a. **(3 marks)** Calculate Power using  Pooled two-sample t-statistic
+```{r}
+set.seed(3150)
+N <- 1000
+N_perm <- 1000
+n1 <- n2 <- 30
+mu1 <- mu2<- 5
+sd1 <- 2
+sd2 <- 3
+
+reject_pooled <- numeric(N)
+reject_welch <- numeric(N)
+reject_ks <- numeric(N)
+
+for(i in 1:N) {
+  norm_vars1 <- rnorm(n1,mu1,sd1)
+  norm_vars2 <- rnorm(n2,mu2,sd2)
+  
+  combined_vars <- c(norm_vars1, norm_vars2)
+  groups<-c(rep(1,n1), rep(2,n2))
+  
+  obs_pooled <- t.test(norm_vars1, norm_vars2, var.equal = TRUE)$statistic
+  obs_welch <- t.test(norm_vars1, norm_vars2, var.equal = FALSE)$statistic
+  obs_ks <- ks.test(norm_vars1, norm_vars2)$statistic
+  
+  perm_pooled <- numeric(N_perm)
+  perm_welch <- numeric(N_perm)
+  perm_ks <- numeric(N_perm)
+  
+  for(j in 1:N_perm){
+    perm_idx<-sample(length(combined_vars))
+    x_perm <- combined_vars[perm_idx]
+    
+    perm_vars1 <- x_perm[1:n1]
+    perm_vars2 <- x_perm[(n1+1):(n1+n2)]
+    
+    perm_pooled[j] <- t.test(perm_vars1, perm_vars2, var.equal = TRUE)$statistic
+     perm_welch[j] <- t.test(perm_vars1, perm_vars2, var.equal = FALSE)$statistic
+      perm_ks[j] <- ks.test(perm_vars1, perm_vars2)$statistic     
+    
+  }
+  
+  p_pooled <- mean(abs(perm_pooled) >= abs(obs_pooled))
+  p_welch <- mean(abs(perm_welch) >= abs(obs_welch))
+  p_ks <- mean(perm_ks >= obs_ks)
+  
+  if(p_pooled< 0.05) reject_pooled[i] <- 1
+  if(p_welch < 0.05) reject_welch[i] <- 1
+  if(p_ks < 0.05) reject_ks[i] <- 1
+}
+
+power_pooled <- mean(reject_pooled)
+print(power_pooled)
+```
+  
+  b. **(3 marks)** Calculate Power using  Welch's t-statistic
+```{r}
+power_welch <- mean(reject_welch)
+print(power_welch)
+
+```
+  c. **(3 marks)** Calculate Power using  Kolmogorov-Smirnov test statistic
+```{r}
+power_ks <- mean(reject_ks)
+print(power_ks)
+```
+
+  d. **(1 mark)** Comment on which test statistic had the highest power.
+```{r}
+print(paste("Kolmogorov-Smirnov statistic had the highest power"))
+```
+
+\newpage
+
+
+# Problem 2
+
+Consider the dataset `Auto` in the `ISLR` package. It contains various information about cars. Look at the help page (`?ISLR::Auto`) for more details.
+
+In this problem, you will perform hypothesis testing using permutation tests in order to study the differences in miles per gallon (mpg) between American and European cars.
+
+  a. **(3 marks)** Using permutation tests and the test statistic from the **t-test**, perform a hypothesis test of a difference in miles-per-gallon distribution between American and European cars. Can you reject the null hypothesis at significance level $\alpha = 0.05$?
+```{r}
+library(ISLR)
+
+K <- 1000
+american_mpg_vec <- ISLR::Auto$mpg[ISLR::Auto$origin == 1]
+european_mpg_vec <- ISLR::Auto$mpg[ISLR::Auto$origin == 2]
+
+combined_data <- c(american_mpg_vec,european_mpg_vec)
+
+N <- length(combined_data)
+
+
+results<-replicate(K, {
+  perm_data <- combined_data[sample(N)]
+  american_perm <- perm_data[1:length(american_mpg_vec)]
+  european_perm <- perm_data[(length(american_mpg_vec)+1):N]
+ t.test(american_perm, european_perm, var.equal = TRUE)$statistic
+})
+
+t_hat <- t.test(american_mpg_vec, european_mpg_vec, var.equal = TRUE)$statistic
+
+mean(abs(c(t_hat, results)) >= abs(t_hat))
+
+
+
+```
+  b. **(3 marks)** Repeat part a) but using the test statistic from the **Kolmogorov-Smirnov test**.
+```{r}
+
+results2<-replicate(K, {
+  perm_data <- combined_data[sample(N)]
+  american_perm <- perm_data[1:length(american_mpg_vec)]
+  european_perm <- perm_data[(length(american_mpg_vec)+1):N]
+ suppressWarnings(ks.test(american_perm, european_perm))$statistic
+})
+
+D_hat <- suppressWarnings(ks.test(american_mpg_vec, european_mpg_vec))$statistic
+mean(abs(c(D_hat, results2)) >= abs(D_hat))
+
+
+
+```
+  c. **(3 marks)** Repeat part a) but using the test statistic from the **Mann-Whitney test** (see `?wilcox.test`).
+```{r}
+
+
+results3<-replicate(K, {
+  perm_data3 <- combined_data[sample(N)]
+  american_perm3 <- perm_data3[1:length(american_mpg_vec)]
+  european_perm3 <- perm_data3[(length(american_mpg_vec)+1):N]
+ wilcox.test(american_perm3, european_perm3, var.equal = TRUE)$statistic
+})
+
+W_hat <- wilcox.test(american_mpg_vec, european_mpg_vec)$statistic
+
+mu_W <- (length(american_mpg_vec)*length(european_mpg_vec))/2
+
+W_hat_centered <- W_hat - mu_W
+results3_centered <- results3 - mu_W
+
+p_value <- mean(abs(results3_centered) >= abs(W_hat_centered))
+
+print(paste("P-value:", p_value))
+
+
+```
+  d. **(1 mark)** Do you get similar or different results from these three approaches? Discuss.
+```{r}
+print(paste("These three approaches show same results that P-values is less than alpha(0.05). So they all reject the null-hypothesis that the mean difference of mpg between the american cars and european cars is similar. And it means that the average mpg distributions between these two cars have a significant difference each other."))
+
+```
+
+\newpage
+
+# Problem 3
+
+  a. **(4 marks)** Make a function that computes the $r^{th}$ nearest neighbour test statistic. You may use the `ann` function from class. Your function should accept the following arguments:
+        1. A matrix corresponding to the first sample
+        2. A matrix corresponding to the second sample
+        3. A positive integer, $r$.
+```{r}
+library(yaImpute)
+calc_nn <- function(x,y,r){
+  z <- c(x,y)
+  z <- as.matrix(z)
+  n_1 <- length(x)
+  n_2 <- length(y)
+  n <- n_1 + n_2
+  k <- r+1
+  NN <- ann(z, z, k = k, verbose = FALSE)
+  NN_mat <- NN$knnIndexDist[,1:k]
+  NN_mat <- NN_mat[,-1]
+  block1 <- NN_mat[1:n_1]
+  block2 <- NN_mat[(n_1+1):n]
+  I1 <- block1 <= n_1
+  I2 <- block2 >= (n_1+1)
+  test_stat <- mean(c(I1,I2))
+  return(test_stat)
+  
+
+}
+
+```
+  b. **(3 marks)** In this question, you will conduct a simulation study to investigate the type I error using your answer from part a. Here are the simulation parameters:
+
+  - Run $N = 1000$ simulations.
+  - Assume $\alpha = 0.05$.
+  - For each simulation, generate two samples from a multivariate normal distribution with dimension 4. The first sample should be of size $n=15$ and the second should of size $n=25$. You may assume, for both samples, that the marginals follow a standard normal distribution and are independent of one another.
+  - Use your answer from part a to calculate the first nearest neighbour test statistic. 
+  - Run a permutation test, using the function you constructed in part a to calculate your permutation test statistics, and obtain a p-value. 
+  - In each simulation, you should make a decision to reject or fail to reject the null hypothesis. 
+After the simulations complete (which may take a while), calculate your type I error rate.  
+```{r}
+simulation <- function(r, N_sim, N_perm){
+  
+  type1_errors <- 0
+  alpha <- 0.05
+  n1 <- 15
+  n2 <- 25
+  p <- 4
+  for(s in 1:N_sim){
+    sample1 <- matrix(rnorm(n1 * p), ncol=p)
+    sample2 <- matrix(rnorm(n2 * p), ncol=p)
+    obs_stat <- calc_nn(sample1, sample2, r=r)
+    
+    perm_stats <- numeric(N_perm)
+    combined <- rbind(sample1, sample2)
+    total_n <- n1 + n2
+    
+    for(k in 1:N_perm){
+      shuffled_idx <- sample(total_n)
+      shuffled_data <- combined[shuffled_idx, ]
+      
+      new_s1 <- shuffled_data[1:n1, ]
+      new_s2 <- shuffled_data[(n1+1):total_n, ]
+      
+      perm_stats[k] <- calc_nn(new_s1, new_s2, r=r)
+    }
+    p_val <- mean(perm_stats >= obs_stat)
+    
+    if(p_val < alpha) {
+      type1_errors <- type1_errors + 1
+    }
+  }
+  return(type1_errors / N_sim)
+}
+set.seed(3150)
+error_r1 <- simulation(r=1, N_sim=1000, N_perm=1000)
+cat("Type I Error (r=1):", error_r1, "\n")
+
+```
+ c) **(3 marks)** Repeat this simulation two more times; once for the second nearest neighbour test statistic, and again for the third nearest neighbour test statistic. Again, these may take a while to complete depending on your computer.  Report your estimates of the type I error in each case, and compare it to your nominal type I error rate. Discuss how the results change between the three different test statistics you used. Finally, discuss what you would change in part b to investigate the power of these multivariate permutation tests. Make sure to be specific. 
+
+```{r}
+# r=2
+error_r2 <- simulation(r=2, N_sim=1000, N_perm=1000)
+cat("Type I Error (r=2):", error_r2, "\n")
+
+# r=3
+error_r3 <- simulation(r=3, N_sim=1000, N_perm=1000)
+cat("Type I Error (r=3):", error_r3, "\n")
+
+print("Discussion: The Type I error rate decreases as r increases.
+Type I error should theoretically be near alpha(0.05). If it is far off, it may be due to a lack of permutation number (N_perm) or asymphetic nature. To investigate Power, you need to simulate by setting the average vector or covariance matrix of the two samples differently.")
+```

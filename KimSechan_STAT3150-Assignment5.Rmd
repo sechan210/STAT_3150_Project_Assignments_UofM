@@ -1,0 +1,316 @@
+---
+title: "Assignment 5"
+author: "Sechan Kim"
+date: "Due on November 21, 2025"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+header-includes: \linespread{1.3}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This assignment covers the resampling module: 
+
+- **Monte Carlo Inference**
+- **Jackknife and Bootstrap**.
+
+The assignment contains **three problems** with multiple parts, worth a total of **30 marks**.
+
+**Instructions**:
+
+  - Rename the file `Assignment5.Rmd` as follows:
+    + `LastnameFirstname_STAT3150-Assignment5.Rmd`
+    
+  - Change the author's name at the top (where you see `First, Last Name`).
+  
+  -  Your solutions must be typed using \LaTeX. One mark will be deducted each time an image is used to show a handwritten solution.
+  
+  - No extensions can be granted for this assignment (unless the student has special permission from Student Accessibility Services).
+  
+  - Assignments submitted after the deadline will receive a grade of zero and will not be accepted.
+  
+  - Solutions must be submitted electronically via UM Learn:
+  
+\begin{center}
+\textbf{no later than 11:59PM CDT on Friday, November 21$^{\text{th}}$}
+\end{center}
+  
+   - Please upload both the `Rmd` file and a PDF version of the output on UMLEARN: 
+   
+\begin{center}
+Course Page > Assessment > Assignments > Assignment 5 > Add File. 
+\end{center}
+
+  - You are allowed to discuss the problems among yourselves, but your submission must reflect your original work. Note that your `R` code will be analysed for suspicious similarities.
+
+
+  
+------
+\newpage
+
+# Problem 1
+
+Suppose the data are generated from a mixture of two distributions:
+
+```{r}
+set.seed(3150)
+n <- 1000
+x1 <- rnorm(n,0,1)
+x2 <- rnorm(n,5,0.5)  
+x <- c(x1, x2)
+hist(x, 100, col = "cyan", freq = FALSE, main="")
+lines(density(x), lwd = 4)
+```
+
+
+  a) **(2 marks)** Calculate Jackknife Mean and 95% Confidence Interval.
+```{r}
+n_total <- length(x)
+theta_hat <- mean(x)
+jack_i_hat <- numeric(n_total)
+for(i in 1:n_total){
+  jack_i_hat[i] <- mean(x[-i])
+}
+print(mean(jack_i_hat))
+bias <- (n_total-1)*(mean(jack_i_hat) - theta_hat)
+se_jack <- sqrt((n_total-1)/n_total * sum((jack_i_hat - mean(jack_i_hat))^2))
+
+ci_jack <- c("LB" = theta_hat - 1.96 * se_jack, "UB" = theta_hat + 1.96 * se_jack)
+print(ci_jack)
+```
+
+  
+  b) **(2 marks)** Calculate Bootstrap Mean (with $B=1000$ samples with replacement) and 95% Confidence Interval (based on standard normal).
+```{r}
+library(boot)
+set.seed(3150) 
+calc_mean <- function(data, indices) {
+  return(mean(data[indices]))
+}
+
+boot_out_mean <- boot(data = x, statistic = calc_mean, R = 1000)
+print(boot_out_mean$t0)
+
+se_boot <- sd(boot_out_mean$t)
+ci_boot <- c(boot_out_mean$t0 - 1.96 * se_boot, boot_out_mean$t0 + 1.96 * se_boot)
+print(ci_boot)
+```
+  
+  c) **(2 marks)** Calculate Jackknife Median and 95% Confidence Interval.
+```{r}
+theta_hat_med <- median(x)
+jack_i_med <- numeric(n_total)
+
+for(i in 1:n_total){
+  jack_i_med[i] <- median(x[-i])
+}
+print(mean(jack_i_med))
+
+se_jack_med <- sqrt((n_total - 1)/n_total * sum((jack_i_med - mean(jack_i_med))^2))
+ci_jack_med <- c(theta_hat_med - 1.96 * se_jack_med, theta_hat_med + 1.96 * se_jack_med)
+print(ci_jack_med)
+
+```
+  d) **(2 marks)** Calculate Bootstrap Median (with $B=1000$ samples with replacement) and 95% Confidence Interval (based on standard normal).
+```{r}
+calc_med <- function(data, indices) {
+  return(median(data[indices]))
+}
+
+boot_out_med <- boot(data = x, statistic = calc_med, R = 1000)
+print(boot_out_med$t0)
+
+se_boot_med <- sd(boot_out_med$t)
+ci_boot_med <- c(boot_out_med$t0 - 1.96 * se_boot_med, boot_out_med$t0 + 1.96 * se_boot_med)
+print(ci_boot_med)
+```
+  
+  e) **(2 marks)** Explain why Jackknife should not be used for estimating the Median and its standard error.
+
+Because the jackknife only works well for "smooth plug-in estimators", whereas it does not provide the consistent estimator for "nonsmooth plug-in estimators" like the median. 
+\newpage
+
+# Problem 2
+
+For this question, we will generate data from multivariate normal distribution:
+\[
+\begin{bmatrix}
+X_1 \\[4pt]
+X_2
+\end{bmatrix} \sim \text{MVN} \!\left(
+\begin{bmatrix}
+0 \\[4pt]
+0
+\end{bmatrix},
+\begin{bmatrix}
+1 & \rho \\[4pt]
+\rho & 1
+\end{bmatrix}
+\right)
+\]
+where $\rho$ is the correlation between $X_1$ and $X_2$. The data can be simulated using `mvtnorm` package with $\rho=0.5$ as:
+
+```{r, warning=FALSE}
+library(mvtnorm)
+set.seed(3150)
+covmat <- matrix(c(1, 0.5, 0.5, 1), ncol = 2)
+rmvnorm(3, mean = c(0, 0), sigma = covmat)
+```
+
+  a) **(2 marks)** Using a single replication, draw 1000 random variables from multivariate normal distribution with $\rho=0.5$, and then compute the estimate for $$g(X_1, X_2)= |X_1+X_2|.$$ Plot the histogram for the sampling distribution of $|X_1 + X_2|$ using `hist(.,breaks=50)`.
+```{r}
+library(mvtnorm)
+set.seed(3150)
+covmat <- matrix(c(1, 0.5, 0.5, 1), ncol = 2)
+n <- 1000
+sample_a <- rmvnorm(n, mean = c(0,0), sigma = covmat)
+g_val <- abs(sample_a[,1] + sample_a[,2])
+
+est_a <- mean(g_val)
+print(est_a)
+
+hist(g_val, breaks = 50, main = "Sampling Distribution of |X1 + X2|")
+```
+  b) **(2 marks)** Repeat the draw for $n=1000$ random variables for $N=2000$ replications, and then compute the estimate for $$\hat{\theta}=\bar{g}(X_1,X_2)= \frac{1}{n} \sum_{i=1}^n g_i(X_1, X_2).$$ Plot the histogram for the sampling distribution of $\hat{\theta}$ for $N=2000$ replications using `hist(.,breaks=50)`.
+  
+```{r}
+K <- 2000
+theta_hats <- numeric(K)
+se_hats <- numeric(K)
+
+for(i in 1:K){
+  samp <- rmvnorm(n, mean = c(0,0), sigma = covmat)
+  vals <- abs(samp[,1] + samp[,2])
+  theta_hats[i] <- mean(vals)
+  se_hats[i] <- sd(vals)/sqrt(n)
+}
+
+hist(theta_hats, breaks = 50, main = "Sampling Distribution of Theta hat")
+```
+  c) **(2 marks)** Calculate the Monte Carlo Standard Deviation (MCSD) from part (b) and Standard Error (SE) of $\hat{\theta}$ from part (a).
+```{r}
+sd(theta_hats)
+sd(g_val)/sqrt(1000)
+```
+  d) **(2 marks)** Calculate 95\% Confidence Intervals for all ($N=2000$) replications, and then plot the first 20 Confidence Intervals with the horizontal line for 
+  \[
+  \theta = E(|X_1 +X_2|)=\frac{2\sqrt{1+\rho}}{\sqrt{\pi}}.
+  \]
+```{r mix.dist}
+true_theta <- 2*sqrt(1.5)/sqrt(pi)
+
+plot(1:20, theta_hats[1:20], ylim=c(min(theta_hats[1:20] - 2*se_hats[1:20]), max(theta_hats[1:20] + 2*se_hats[1:20])),
+     ylab="Theta estimate", xlab="Replication Index", main="First 20 Confidence Intervals")
+segments(1:20, theta_hats[1:20] - 1.96*se_hats[1:20], 1:20, theta_hats[1:20] + 1.96*se_hats[1:20])
+abline(h=true_theta, col="red", lwd=2)
+```
+  e) **(2 marks)** Find the Coverage Probability of 95\% Confidence Intervals over $N=2000$ replications.
+```{r}
+lower <- theta_hats - 1.96 * se_hats
+upper <- theta_hats + 1.96 * se_hats
+
+coverage <- mean(lower <= true_theta & upper >= true_theta)
+print(coverage)
+```
+  
+
+\newpage
+
+# Problem 3
+
+For this question, we will generate data from multivariate normal distribution:
+\[
+\begin{bmatrix}
+X_1 \\[4pt]
+X_2
+\end{bmatrix} \sim \text{MVN} \!\left(
+\begin{bmatrix}
+0 \\[4pt]
+0
+\end{bmatrix},
+\begin{bmatrix}
+1 & \rho \\[4pt]
+\rho & 1
+\end{bmatrix}
+\right)
+\]
+where $\rho$ is the correlation between $X_1$ and $X_2$. The data can be simulated using `mvtnorm` package with $\rho=0.9$ as:
+
+```{r, warning=FALSE}
+library(mvtnorm)
+set.seed(3150)
+covmat <- matrix(c(1, 0.9, 0.9, 1), ncol = 2)
+rmvnorm(3, mean = c(0, 0), sigma = covmat)
+```
+
+  a) **(2 marks)** Generate a sample with $n=20$ from bivariate normal distribution with a correlation $\rho=0.9$. Estimate the bias of $\hat{\rho}$ and 95\% confidence interval using the following expression:
+\[
+(\hat{\rho} - \rho) \pm z_{\frac{\alpha}{2}} \times \sqrt{\frac{1-\hat{\rho}^2}{n-2}}.
+\]
+```{r, warning=FALSE}
+library(mvtnorm)
+set.seed(3150)
+covmat3 <- matrix(c(1, 0.9, 0.9, 1), ncol=2)
+n3 <- 20
+samp3 <- rmvnorm(n3, mean = c(0, 0), sigma = covmat3)
+rho_hat <- cor(samp3[,1], samp3[,2])
+true <- 0.9
+
+bias <- rho_hat - true
+print(bias)
+alpha <- 0.05
+z <- qnorm(1-alpha/2)
+margin <- z * sqrt((1-rho_hat^2)/(n-2))
+ci <- c((rho_hat-true) - margin, (rho_hat-true) + margin)
+print(ci)
+```
+ 
+
+For part (b) to (e), use the sample with $n=20$ from part (a), and use $\alpha=0.05$ and $N=200$ replications. 
+
+  b) **(2 marks)** Compute the jackknife confidence interval  for $\hat{\rho}-\rho$ based on the standard normal distribution. 
+```{r, warning=FALSE}
+jack_r <- numeric(n3)
+for(i in 1:n3){
+  jack_r[i] <- cor(samp3[-i, 1], samp3[-i,2])
+}
+se_jack_r <- sqrt((n3-1)/n3 * sum((jack_r - mean(jack_r))^2))
+
+ci_jack <- c((rho_hat-true) - 1.96 * se_jack_r, (rho_hat-true) + 1.96 * se_jack_r)
+print(ci_jack)
+```
+  
+   c) **(2 marks)** Compute the bootstrap confidence interval  for $\hat{\rho}-\rho$ based on the percentile method for $N$ replications. 
+```{r, warning=FALSE}
+
+library(boot)
+set.seed(3150)
+calc_bias <- function(data, indices){
+  d <- data[indices,]
+  r <- cor(d[,1], d[,2])
+  return(r - true)
+}
+
+boot_r <- boot(data=samp3, statistic = calc_bias, R=200)
+
+boot_cis <- boot.ci(boot_r, type = c("perc", "basic", "bca"))
+
+print(boot_cis$percent)
+```
+  
+   d) **(2 marks)** Compute the bootstrap confidence interval  for $\hat{\rho}-\rho$ based on the basic method for $N$ replications. 
+```{r, warning=FALSE}
+print(boot_cis$basic)
+```
+   
+   e) **(2 marks)** Compute the bootstrap confidence interval  for $\hat{\rho}-\rho$ based on the  BCa method for $N$ replications. 
+```{r, warning=FALSE}
+
+print(boot_cis$bca)
+```
+   
+

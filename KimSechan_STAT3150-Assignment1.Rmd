@@ -1,0 +1,253 @@
+---
+title: "STAT3150: Assignment 1"
+author: "Sechan, Kim"
+date: "Due at 11:59 PM on 09/26/2025"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+header-includes: \linespread{1.3}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This assignment covers the basics of `R` and the module on 
+
+  - **Numerical Methods** 
+  - **Maximum Likelihood Estimation**. 
+
+The assignment contains **three problems** with multiple parts, worth a total of **30 marks**.
+
+
+**Instructions**:
+
+  - Rename the file `Assignment1.Rmd` as follows:
+    + `LastnameFirstname_STAT3150-Assignment1.Rmd`
+  - Change the author's name at the top (where you see `First, Last Name`).
+  - Solutions must be submitted electronically via UM Learn:
+  
+\begin{center}
+\textbf{no later than 11:59PM CDT on Friday, September 26$^{\text{th}}$}
+\end{center}
+  
+   - Please upload both the `Rmd` file and a PDF version of the output on UMLEARN: 
+   
+\begin{center}
+Course Page > Assessment > Assignments > Assignment 1 > Add File. 
+\end{center}
+
+  - You are allowed to discuss the problems among yourselves, but your submission must reflect your original work. Note that your `R` code will be analysed for suspicious similarities.
+
+
+  
+------
+
+\newpage
+
+# Problem 1
+
+For this problem, we will use the dataset `ToothGrowth`. This dataset is available in base `R` and can be accessed directly:
+```{r, eval=FALSE}
+head(ToothGrowth)
+ToothGrowth
+```
+The data are from an experiment examining vitamin C dosage delivered in 2 different methods. The dataset predicts tooth growth in guinea pigs. The data consist of 60 observations, representing 60 guinea pigs, and 3 variables:
+
+- `len` : numeric, tooth (odontoblast, actually) length
+- `supp` : factor, supplement type, 2 levels, (`VC`) is ascorbic acid (Vitamin C), and `OJ` is orange juice
+- `dose` : numeric, dose (mg/day)
+
+We will perform a two-sample t-test of `len`, where each sample is defined by the value of `supp`. We will ignore `dose` variable. We will use the following test statistic:
+
+$$ T = \frac{\bar{X} - \bar{Y}}{\sqrt{\frac{s^2_X}{n_X} + \frac{s^2_Y}{n_Y}}},$$
+
+where
+
+  - $\bar{X},\bar{Y}$ are the sample *means* of each sample;
+  - $s^2_X,s^2_Y$ are the sample *variances* of each sample;
+  - $n_X,n_Y$ are the sample *sizes* of each sample.
+
+  a) **(2 marks)** Create a vector `xvec` containing the values of `len` corresponding to `supp == VC`. Similarly, create a vector `yvec` containing the values of `len` corresponding to `supp == OJ`. What are the lengths of each vector?
+```{r}
+xvec <- ToothGrowth[ToothGrowth$supp == "VC", ]$len
+xvec
+
+yvec <- ToothGrowth[ToothGrowth$supp == "OJ", ]$len
+yvec
+
+lenx <- length(xvec)
+leny <- length(yvec)
+
+lenx
+leny
+
+  
+```
+  
+  b) **(2 marks)** Compute the sample mean and sample variance of each vector. Print these four values as part of your solutions.
+```{r}
+
+meanx <- mean(xvec)
+varx <- var(xvec)
+
+meany <- mean(yvec)
+vary <- var(yvec)
+
+meanx
+varx
+meany
+vary
+
+  
+```
+  c) **(2 marks)** Compute the test statistic using the formula above, and print its value.
+
+```{r}
+  
+T <- (meanx - meany)/sqrt(varx/lenx + vary/leny)
+T
+
+```
+  d) **(2 marks)** Read the help page for the function `pt`. Compute the p-value for this test statistic, and print the p-value. Recall that the degree of freedom $\nu$ is given by
+\[
+\nu = \frac{\left(\frac{s^2_X}{n_X} + \frac{s^2_Y}{n_Y}\right)^2}{\frac{s^4_X}{n_X^2(n_X - 1)} + \frac{s^4_Y}{n_Y^2(n_Y - 1)}}.
+\]
+
+```{r}
+  
+numerator_v <- (varx/lenx + vary/leny)^2
+
+denominator_v <- ((varx/lenx)^2/(lenx-1)) + ((vary/leny)^2/(leny-1))
+v <- numerator_v/denominator_v
+v
+p <- pt(T,v)
+p
+
+```
+ 
+  e) **(2 marks)** Using your results from Parts (c) and (d), draw a statistical conclusion on whether the null hypothesis should be rejected in favor of the alternative hypothesis using 5\% level of significance.
+  
+  Due to the p-value( 0.03031725) is smaller than the level of significance(0.05), there is a sufficient evidence that can reject the null hypothesis. Therefore, there is a meaningful difference in the length of teeth between dosing VC and OJ. 
+
+\newpage
+
+# Problem 2
+
+a) **(4 marks)** Write your own implementation of the bisection method as a function. Your implementation should return the root of d$f$ contained in the interval [a, b]. The function should accept 4 arguments: 
+
+    - the function, $f$, that we are searching for the root of,  
+    - an initial lower bound,  
+    - an initial upper bound,  
+    - tolerance value to determine convergence (denoted $\epsilon$ in the notes).
+    
+  
+```{r}
+  
+bisection <- function(f, low_b, upp_b, epsilon = 10^(-7)){
+  # c)
+  if(f(low_b) * f(upp_b) >= 0){
+    stop("Error: this initial interval does not contain a root or have many roots.")
+  }
+  
+  x_next<-(low_b + upp_b)*0.5
+  x_next
+  
+  f_low <- f(low_b)
+  f_ub <- f(upp_b)
+  f_next <- f(x_next)
+  
+  
+  while(abs(f_next) > epsilon){
+    if(f_ub * f_next > 0){
+      upp_b <- x_next
+      f_ub <- f(upp_b)
+    } else if(f_ub*f_next < 0){
+      low_b <- x_next
+      f_low <- f(low_b)
+    }
+    
+    x_next <- 0.5*(low_b + upp_b)
+    f_next <- f(x_next)
+  }
+  return(x_next)
+} 
+
+```
+
+b) **(2 marks)** If a tolerance value is not specified when calling the function, a default value of $10^{-7}$ should be used. Adjust your function so that this value is used as a default value for the $\epsilon$ parameter. 
+
+b) **(2 marks)** In your function, implement a check to ensure that the initial interval contains a root. If the interval does not contain a root, your function should stop execution and return an error message. 
+
+c) **(2 marks)** Use your function to find an approximation of $\sqrt{3}$ with a tolerance value of $\epsilon = 10^{-10}$. Your solution should not use the function `sqrt`, and it should not include raising numbers to a fractional power (e.g. `x^0.5`).  (**Hint**: Use the function $f(x)=x^2-3$ and find its root.)
+
+```{r}
+f <- function(x){
+  x^2-3
+}
+bisection(f, 1, 2, epsilon = 10^(-10))
+
+```
+
+
+
+\newpage
+
+# Problem 3
+
+Suppose $X_1,...X_n \overset{\text{i.i.d.}}{\sim} N(0, \sigma^2)$, where 
+\[
+f(x) = \frac{1}{\sqrt{2 \pi \sigma^2}} \exp\Bigg(-\frac{x^2}{2\sigma^2}\Bigg), \quad x \in \mathbb{R}.
+\]
+
+  a) **(2 marks)** Write down the likelihood function, and then the log-likelihood function.
+$$
+L(\sigma^2|x) = (2\pi\sigma^2)^{-\frac{n}{2}}e^{\frac{-\sum_{i=1}^{n}X_{i}^2}{2\sigma^2}}
+\\
+l(\sigma^2|x) = -\frac{n}{2}ln(2\pi)-\frac{n}{2}ln(\sigma^2) - \frac{1}{2\sigma^2}\sum_{i=1}^{n}X_{i}^2
+$$
+
+  b) **(4 marks)** Using the log-likelihood function, find the maximum likelihood estimator for $\sigma^2$. Also, check the second derivative to ensure that it is a maximum (**Hint**: Plug-in the MLE in the second derivative).
+$$
+\frac{-n}{2\sigma^2} + \frac{\sum_{i=1}^{n}X_{i}^2}{2\sigma^4} = 0
+\\
+\sum_{i=1}^{n}X_{i}^2 = n\sigma^2
+\\
+second-derivative: \frac{n}{2\sigma^4} - \frac{\sum_{i=1}^{n}X_{i}^2}{\sigma^8}
+\\
+= \frac{n}{2\sigma^4} - \frac{n\sigma^2}{\sigma^8}
+\\
+= -\frac{n}{2\sigma^4} < 0
+\\
+$$
+Therefore, the MLE for \sigma^2 is maximum.
+  
+  c) **(4 marks)** Using the simulated data (contained in vector `x` below), confirm that the **analytic solution** from the MLE and the bisection method are equivalent. 
+
+
+```{r}
+set.seed(32452) # do not change the seed.
+n=1000
+mu=0
+x1 <- rnorm(n,mu,1)
+x2 <- rnorm(n,mu,2)
+x3 <- rnorm(n,mu,4)
+x <- c(x1, x2, x3)
+
+MLE <- sum(x^2)/length(x)
+
+deriv_log<-function(theta, data){
+  n1 <- length(data)
+  ssq <- sum(data^2)
+  return(-n1/(2*theta) + ssq / (2*theta^2))
+}
+
+numerical_mle <- uniroot(deriv_log, interval = c(0.1, 20), data=x)$root
+
+MLE
+numerical_mle
+
+```
+**Note:** You may choose to use `bisection()` function from Problem 2, or you can use built-in `R` functions such as `uniroot()` or `optimize()`.
+  

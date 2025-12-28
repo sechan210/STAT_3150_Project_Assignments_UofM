@@ -1,0 +1,302 @@
+---
+title: "STAT 3150: Assignment 2"
+author: "Sechan, Kim"
+date: "Due on October 10, 2025"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+header-includes: \linespread{1.3}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This assignment covers the basics of `R` and the module on 
+
+ - **Numerical Methods**, 
+ - **Optimization**, 
+ - **Generating Random Variates**. 
+
+The assignment contains **three problems** with multiple parts, worth a total of **30 marks**.
+
+
+**Instructions**:
+
+  - Rename the file `Assignment2.Rmd` as follows:
+    + `LastnameFirstname_STAT3150-Assignment2.Rmd`
+  - Change the author's name at the top (where you see `First, Last Name`).
+  - Solutions must be submitted electronically via UM Learn:
+  
+\begin{center}
+\textbf{**no later than 11:59PM on Friday, October 10th**}
+\end{center}
+  
+   - Please upload both the `Rmd` file and a PDF version of the output on UMLEARN: 
+   
+\begin{center}
+Course Page > Assessment > Assignments > Assignment 2 > Add File. 
+\end{center}
+
+  - You are allowed to discuss the problems among yourselves, but your submission must reflect your original work. Note that your `R` code will be analysed for suspicious similarities.
+
+\newpage
+
+# Problem 1
+
+The following data come from a gamma distribution with shape parameter $\alpha$ and scale parameter 1:
+
+```{r}
+dataset <-   c(1.371, 1.233, 1.738, 2.091, 0.513, 
+            2.097, 0.499, 3.625, 0.373, 0.119, 
+            2.870, 3.913,  0.796, 1.266, 3.748, 
+            2.112, 0.329, 1.624, 2.538, 0.485)
+```
+
+The density function for ${\texttt{Gamma}}(\alpha, 1)$:
+
+\[
+f(x; \alpha, 1) = \frac{1}{\Gamma(\alpha)} x^{\alpha - 1} e^{-x}, \quad x > 0.
+\]
+
+
+  a. **(2 marks)** Find the log-likelihood function for $n$ observations $X_1, \ldots, X_n$ with distribution ${\texttt{Gamma}}(\alpha, 1)$. Show your work. 
+$$
+L(\alpha|x) = \prod_{i=1}^{n}\frac{1}{\Gamma(\alpha)}x_{i}^{\alpha-1}e^{-x_{i}}
+\\
+l(\alpha|x) = \sum_{i=1}^{n}[\log(\frac{1}{\Gamma(\alpha)}) + (\alpha-1)\log(x_{i})-x_{i}]
+\\
+= -n\log(\Gamma(\alpha)) + \sum_{i=1}^{n}[(\alpha-1)\log(x_{i})-x_{i}]
+
+$$
+  b. **(2 marks)** Compute the first derivative and second derivative of the log-likelihood to find the MLE for $\psi(\alpha) = \frac{\partial log(\Gamma(\alpha))}{\partial \alpha}$. Show your work. **Note**: It is sufficient to solve the MLE for $\psi(\alpha) = \frac{\partial log(\Gamma(\alpha))}{\partial \alpha}$.
+$$
+\psi(\alpha) = \frac{\partial log(\Gamma(\alpha))}{\partial \alpha}
+\\
+\frac{\partial l(\alpha|x)}{\partial \alpha} = -n\frac{\partial log(\Gamma(\alpha))}{\partial \alpha} + \sum_{i=1}^{n}\log(x_{i})
+\\
+= -n\psi(\alpha) + \sum_{i=1}^{n}\log(x_{i})
+\\
+\frac{\partial^2 l(\alpha|x)}{\partial \alpha^2} = -n\psi'(\alpha)
+
+$$
+  c. **(3 marks)** Write an implementation of the Newton-Raphson method and then use it to find the maximum of the log-likelihood function with starting values $x_k = 2$. Use a convergence value of $\epsilon = 10^{-10}$ and set the maximum number of iterations to 100.  The Newton-Raphson iterative step is defined as
+\[
+x_{k+1}= x_k +h = x_k - \frac{f'(x_k)}{f''(x_k)} .
+\]
+```{r}
+sum_log_x <- sum(log(dataset))
+sum_x <- sum(dataset)
+
+log_likelihood <- function(alpha, data) {
+  n <- length(data)
+  -n * lgamma(alpha) + (alpha - 1) * sum(log(data)) - sum(data)
+}
+
+first_derivative <- function(alpha, data){
+  n <- length(data)
+  sum_log_x <- sum(log(data))
+ return(-n * digamma(alpha) + sum_log_x)
+}
+second_derivative <- function(alpha,data){
+  n <- length(data)
+  return(-n * trigamma(alpha))
+}
+
+my_newton_raphson <- function(first_prime, second_prime, start, data, epsilon = 10^(-10), max_iter = 100){
+  x_k <- start
+  for(i in 1:max_iter){
+    x_k_plus_1 <- x_k - first_prime(x_k, data)/second_prime(x_k, data)
+    
+    if(abs(x_k_plus_1 - x_k) < epsilon){
+      return(x_k_plus_1)
+    }
+    x_k <- x_k_plus_1
+  }
+  
+  return(x_k)
+}
+
+mle <- my_newton_raphson(first_derivative, second_derivative, 2, dataset, epsilon = 10^(-10), max_iter = 100)
+
+print(mle)
+
+```
+
+  d. **(3 marks)** Write an implementation of the secant method and then use it to find the maximum of the log-likelihood function with starting values $x_0 = 0.1$ and $x_1 = 5$. Use a convergence value of $\epsilon = 10^{-7}$ and set the maximum number of iterations to 100.  The secant is defined as
+\[
+x_{k+1}= x_k - f(x_k) \frac{x_k-x_{k-1}}{f(x_k)-f(x_{k-1})}.
+\]
+```{r}
+secant <- function(f, x_0, x_1, epsilon, data, max_it = 100){
+  x_k_minus_1 <- x_0
+  x_k <- x_1
+  for(i in 1:max_it){
+    f_x_k <- f(x_k, data)
+    f_x_k_minus_1 <- f(x_k_minus_1, data)
+    
+    x_k_plus_1 <- x_k - f_x_k*(x_k - x_k_minus_1)/(f_x_k - f_x_k_minus_1)
+    
+    if(abs(x_k_plus_1 - x_k) < epsilon){
+      return(x_k_plus_1)
+    }
+    
+    x_k_minus_1 <- x_k
+    x_k <- x_k_plus_1
+  }
+  return(x_k)
+}
+
+mle_secant <- secant(f = first_derivative, x_0 = 0.1, x_1 = 5, data = dataset, epsilon = 10^(-7), max_it = 100)
+
+print(mle_secant)
+
+```
+
+\newpage
+
+# Problem 2
+
+A company has measured yearly food waste (in kg) of 1000 different Canadian households between 2018 and 2019. They have hired you to fit an exponential distribution to the data using maximum likelihood estimates found through Newton-Raphson. You tried your best to convince them that you did not need to rely on an optimization algorithm, but they would not listen and, therefore, you are forced to obey their request.
+
+Start your task by downloading `food_waste.txt`. As you can see, some of their data was improperly recorded and/or corrupted, resulting in some "NA" values. Additionally, their data is not in a standard format, such as a csv file or neatly formatted table. 
+
+a. **(2 marks)** Load the dataset into R and remove all NA values. Explore different functions and arguments to do so, if necessary. 
+```{r}
+food_waste_raw <- scan("food_waste.txt", sep = ";", what = "numeric", na.strings = "NA", quiet = TRUE)
+food_waste_clean <- food_waste_raw[!is.na(food_waste_raw)]
+
+food_waste_clean <- food_waste_clean[food_waste_clean != ""]
+
+food_waste_numeric <- as.numeric(food_waste_clean)
+```
+b. **(3 marks)** Find the first and second derivative of the log-likelihood function for the exponential distribution with the following configuration:
+\[
+f(x; \lambda) = \frac{1}{\lambda}\exp\!\left(-\frac{x}{\lambda}\right), \quad x > 0, \; \lambda > 0.
+\]
+Note: $\frac{1}{\lambda}$ is the scale parameter of the exponential distribution (not the rate parameter).
+$$
+l'(\lambda) = -\frac{n}{\lambda} + \frac{1}{\lambda^2}\sum_{i=1}^{n}x_{i}
+\\
+l''(\lambda) = \frac{n}{\lambda^2} - \frac{2}{\lambda^3}\sum_{i=1}^{n}x_{i}
+$$
+c. **(3 marks)** Implement the Newton-Raphson method and apply it to the data using a starting value of 110. Set the tolerance level $\epsilon = 10^{-7}$ and the maximum number of iterations to 1000. Display the resulting parameter estimates.
+```{r}
+
+
+log_likelihood_exp <- function(lambda, data) {
+  n <- length(data)
+  s <- sum(data)
+  
+  return(-n * log(lambda) -  s/lambda)
+  
+}
+
+first_derivative_exp <- function(lambda, data){
+  n <- length(data)
+  s <- sum(data)
+  return(-n/lambda + s/lambda^2)
+}
+second_derivative_exp <- function(lambda,data){
+  n <- length(data)
+  s <- sum(data)
+  return(n/lambda^2 - 2*s/lambda^3)
+}
+
+exp_mle <- my_newton_raphson(first_derivative_exp, second_derivative_exp, 110, data = food_waste_numeric, epsilon = 10^(-7), max_iter = 1000)
+
+print(exp_mle)
+
+```
+
+d. **(2 marks)** Compare your parameter estimates with the maximum likelihood estimate of $\lambda$ obtained analytically (i.e., without optimization) in Part (b). Comment on the similarity between the Newton--Raphson estimate and the MLE.
+```{r}
+analytical_mle <- mean(food_waste_numeric)
+cat("MLE Obtained Analytically:", analytical_mle, "\n")
+cat("MLE Obtained by Newton--Raphson estimate:", exp_mle, "\n")
+cat("Difference between two observations:", abs(analytical_mle - exp_mle), "\n")
+cat("Therefore, those two ways are same.", "\n")
+```
+
+
+\newpage
+
+# Problem 3 
+
+a. **(3 marks)** Using a Linear Congruential Generator (LCG) with parameters \(a = 1764325\), \(c = 1013904220\), and \(m = 2^{32}\), generate 10,000 random variates on the interval \([0, 1]\). Initialize the LCG function with a seed value of 3150.   Inspect the histogram with `hist(., breaks = 50)` to determine if the 10,000 random variates are uniformally distributed. Also, generate 10,000 random variates using `runif()` function from `Uniform(0,1)` distribution, and compare the qqplot between random variates from `runif()` function and `lcg()` function.   **Note:** You may use and adapt the code posted on UM Learn for the LCG we discussed in class.
+```{r}
+lcg <- function(seed, a, c, m, n){
+  random_numbers <- numeric(n)
+  random_numbers[1] <- seed
+  
+  for(i in 2:n){
+    random_numbers[i] <- (a * random_numbers[i-1] + c) %% m
+  }
+  return(random_numbers)
+}
+a <- 1764325
+c <- 1013904220
+m <- 2^32
+seed <- 3150
+n <- 10000
+
+rvs_for_lcg <- lcg(seed = seed, a = a, c = c, m = m, n = n)
+
+rvs_for_lcg <- rvs_for_lcg / 2^32
+
+runif_variates <- runif(n)
+
+hist(rvs_for_lcg, breaks = 50, main = "LCG HIST", xlab = "values")
+
+qqplot(rvs_for_lcg, runif_variates, main = "LCG vs. runif() QQ", xlab = "LCG random variates", ylab = "runif() random variates")
+abline(0, 1, col = "red")
+cat("The Q-Q plot shows points approximately along the diagonal line, so these generated samples are following the exponential distribution.", "\n")
+```
+b. **(3 marks)** The CDF of the Logistic distribution is given by:  
+\[
+F(x; \mu, s) = \frac{1}{1 + \exp\left(-\frac{x-\mu}{s}\right)}, 
+\quad -\infty < x < \infty
+\]  
+Using the Inverse-Transform method, find the quantile function for the Logistic distribution with parameters \(\mu\) and \(s\).
+$$
+p = \frac{1}{1 + \exp(-\frac{x-\mu}{s})}
+\\
+\frac{1}{p} = 1 + \exp(-\frac{x-\mu}{s})
+\\
+\log(\frac{1-p}{p}) = -\frac{x-\mu}{s}
+\\
+x = \mu - s*\log(\frac{1-p}{p})
+\\
+x = \mu + s*\log(\frac{p}{1-p})
+$$
+
+
+c. **(2 marks)** Using the quantile function from part (b) and the random numbers from part (a) with `LCG()` function, generate 10,000 random variates in `R` with parameters \(\mu = 0\) and \(s = 1\).  
+```{r}
+logistic_quantile_func <- function(p, mu, s) {
+  return(mu + s * log(p / (1 - p)))
+}
+
+mu <- 0
+s <- 1
+p <- rvs_for_lcg
+logistic_vars <- mu + s * log(p / (1 - p))
+
+
+```
+
+d. **(2 marks)** Generate 10,000 random variates using the `rlogis` function in `R` with parameters \(\mu = 0\) and \(s = 1\). Use side-by-side histograms to compare the random variates generated in part (c) with the random variates generated using the `rlogis` function. Also, compare the qqplot between random variates from `rlogis()` function and from part (c).
+```{r}
+rlogis_variates <- rlogis(n, location = mu, scale = s)
+par(mfrow = c(1, 2))
+hist(logistic_vars, breaks = 50, main = "Variates generated in part (c)", xlab = "values")
+hist(rlogis_variates, breaks = 50, main = "Variates generated in part (d)", xlab = "values")
+par(mfrow = c(1,1))
+
+qqplot(logistic_vars, rlogis_variates,
+       main = "part (c) vs. rlogis() QQ-Plot",
+       xlab = "Variates generated in part (c)", ylab = "Variates generated in part (d)")
+abline(0, 1, col = "red")
+cat("These two groups of random variates that are generated by two different methods follow a same logistic distribution, because the shapes of side-by-side histograms look quite similar, as well as the Q-Q plot shows points approximately along the diagonal line.")
+```
